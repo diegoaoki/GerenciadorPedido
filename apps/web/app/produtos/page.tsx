@@ -157,29 +157,6 @@ function ChannelDescriptions({ product, onSaved }: { product: Product; onSaved: 
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [aiLoading, setAiLoading] = useState<string | null>(null); // marketplace em geração
-
-  async function suggestWithAi(marketplace: string) {
-    setAiLoading(marketplace);
-    setErr(null);
-    try {
-      const res = await api.post<{ suggestion: string }>('/ai/suggest-description', {
-        productId: product.id,
-        marketplace,
-        draft: drafts[marketplace] || undefined,
-      });
-      setDrafts((d) => ({ ...d, [marketplace]: res.suggestion }));
-    } catch (e) {
-      const msg = (e as Error).message;
-      setErr(
-        msg.includes('503') || msg.includes('ANTHROPIC_API_KEY')
-          ? 'IA não configurada: adicione sua ANTHROPIC_API_KEY em apps/api/.env e reinicie a API.'
-          : msg,
-      );
-    } finally {
-      setAiLoading(null);
-    }
-  }
 
   const filled = product.channelDescriptions.length;
 
@@ -245,28 +222,18 @@ function ChannelDescriptions({ product, onSaved }: { product: Product; onSaved: 
           <div key={key}>
             <div className="mb-1 flex items-center justify-between">
               <span className="text-xs font-medium text-slate-600">{label}</span>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => suggestWithAi(key)}
-                  disabled={aiLoading !== null}
-                  className="text-xs text-purple-600 hover:underline disabled:cursor-wait disabled:text-slate-300"
-                  title={`Gerar descrição para ${label} com IA, a partir dos dados do produto${drafts[key]?.trim() ? ' e do rascunho atual' : ''}`}
-                >
-                  {aiLoading === key ? '✨ Gerando…' : '✨ Sugerir com IA'}
-                </button>
-                <button
-                  onClick={() => setDrafts((d) => ({ ...d, [key]: product.description ?? '' }))}
-                  disabled={!product.description?.trim()}
-                  className="text-xs text-brand hover:underline disabled:cursor-not-allowed disabled:text-slate-300"
-                  title={
-                    product.description?.trim()
-                      ? 'Copiar a descrição base para este marketplace'
-                      : 'Produto sem descrição base para copiar'
-                  }
-                >
-                  ⧉ Copiar da base
-                </button>
-              </div>
+              <button
+                onClick={() => setDrafts((d) => ({ ...d, [key]: product.description ?? '' }))}
+                disabled={!product.description?.trim()}
+                className="text-xs text-brand hover:underline disabled:cursor-not-allowed disabled:text-slate-300"
+                title={
+                  product.description?.trim()
+                    ? 'Copiar a descrição base para este marketplace'
+                    : 'Produto sem descrição base para copiar'
+                }
+              >
+                ⧉ Copiar da base
+              </button>
             </div>
             <textarea
               value={drafts[key] ?? ''}
