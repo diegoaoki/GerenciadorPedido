@@ -1,6 +1,7 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
 
@@ -26,6 +27,16 @@ class RegisterDto {
   password!: string;
 }
 
+class ChangePasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  currentPassword!: string;
+
+  @IsString()
+  @MinLength(6, { message: 'A nova senha precisa de pelo menos 6 caracteres' })
+  newPassword!: string;
+}
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -42,5 +53,18 @@ export class AuthController {
   @Post('register')
   register(@Body() dto: RegisterDto) {
     return this.auth.register(dto.name, dto.email, dto.password);
+  }
+
+  /** Usuário logado troca a própria senha. */
+  @Post('change-password')
+  changePassword(
+    @Req() req: Request & { user?: { sub?: string } },
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.auth.changePassword(
+      req.user?.sub ?? '',
+      dto.currentPassword,
+      dto.newPassword,
+    );
   }
 }

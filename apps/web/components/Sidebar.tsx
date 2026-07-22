@@ -55,7 +55,12 @@ export function Sidebar() {
         })}
       </nav>
       <div className="flex items-center justify-between px-5 py-4">
-        <span className="text-xs text-slate-400">v0.1.0</span>
+        <Link
+          href="/trocar-senha"
+          className="text-xs font-medium text-slate-500 hover:text-brand"
+        >
+          🔑 Trocar senha
+        </Link>
         <button
           onClick={() => auth.logout()}
           className="text-xs font-medium text-slate-500 hover:text-red-600"

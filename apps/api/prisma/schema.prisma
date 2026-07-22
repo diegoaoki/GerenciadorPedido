@@ -99,6 +99,10 @@ model User {
   role         UserRole   @default(USER)
   status       UserStatus @default(PENDING)
 
+  // Quando true, o usuário é obrigado a trocar a senha no próximo login
+  // (setado no reset pelo admin ou em "exigir troca").
+  mustChangePassword Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

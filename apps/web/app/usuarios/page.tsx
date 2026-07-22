@@ -10,6 +10,7 @@ interface UserRow {
   email: string;
   role: 'ADMIN' | 'USER';
   status: 'PENDING' | 'ACTIVE' | 'BLOCKED';
+  mustChangePassword: boolean;
   createdAt: string;
 }
 
@@ -23,6 +24,21 @@ export default function UsuariosPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [resetInfo, setResetInfo] = useState<{ email: string; tempPassword: string } | null>(null);
+
+  async function resetPassword(id: string, email: string) {
+    if (!confirm(`Resetar a senha de ${email}? A senha atual deixará de funcionar.`)) return;
+    const res = await api.patch<{ email: string; tempPassword: string }>(
+      `/users/${id}/reset-password`,
+    );
+    setResetInfo(res);
+    load();
+  }
+
+  async function requireChange(id: string) {
+    await api.patch(`/users/${id}/require-password-change`);
+    load();
+  }
 
   async function load() {
     try {
@@ -56,6 +72,27 @@ export default function UsuariosPage() {
 
       {err && (
         <Card className="mb-6 border-red-200 bg-red-50 text-sm text-red-700">{err}</Card>
+      )}
+
+      {resetInfo && (
+        <Card className="mb-6 border-amber-300 bg-amber-50">
+          <div className="text-sm font-semibold text-amber-800">
+            🔑 Senha temporária de {resetInfo.email}:
+          </div>
+          <div className="mt-1 font-mono text-lg font-bold text-amber-900">
+            {resetInfo.tempPassword}
+          </div>
+          <p className="mt-1 text-xs text-amber-700">
+            Repasse ao usuário — ele será obrigado a trocar no primeiro login.
+            Esta senha não será mostrada de novo.
+          </p>
+          <button
+            onClick={() => setResetInfo(null)}
+            className="mt-2 text-xs text-amber-700 underline"
+          >
+            fechar
+          </button>
+        </Card>
       )}
 
       {loading ? (
@@ -126,22 +163,45 @@ export default function UsuariosPage() {
                         <Badge status={u.status} />
                       </td>
                       <td className="px-5 py-3 text-right">
-                        {u.role !== 'ADMIN' &&
-                          (u.status === 'ACTIVE' ? (
+                        <div className="flex justify-end gap-3">
+                          <button
+                            onClick={() => resetPassword(u.id, u.email)}
+                            className="text-xs font-medium text-amber-600 hover:underline"
+                            title="Gera senha temporária e obriga troca no próximo login"
+                          >
+                            Resetar senha
+                          </button>
+                          {u.role !== 'ADMIN' && !u.mustChangePassword && (
                             <button
-                              onClick={() => setStatus(u.id, 'BLOCKED')}
-                              className="text-xs font-medium text-red-600 hover:underline"
+                              onClick={() => requireChange(u.id)}
+                              className="text-xs font-medium text-slate-500 hover:underline"
+                              title="No próximo login o usuário terá que definir nova senha"
                             >
-                              Bloquear
+                              Exigir troca
                             </button>
-                          ) : (
-                            <button
-                              onClick={() => setStatus(u.id, 'ACTIVE')}
-                              className="text-xs font-medium text-green-600 hover:underline"
-                            >
-                              Reativar
-                            </button>
-                          ))}
+                          )}
+                          {u.mustChangePassword && (
+                            <span className="text-xs text-amber-500" title="Troca de senha pendente">
+                              🔑 troca pendente
+                            </span>
+                          )}
+                          {u.role !== 'ADMIN' &&
+                            (u.status === 'ACTIVE' ? (
+                              <button
+                                onClick={() => setStatus(u.id, 'BLOCKED')}
+                                className="text-xs font-medium text-red-600 hover:underline"
+                              >
+                                Bloquear
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setStatus(u.id, 'ACTIVE')}
+                                className="text-xs font-medium text-green-600 hover:underline"
+                              >
+                                Reativar
+                              </button>
+                            ))}
+                        </div>
                       </td>
                     </tr>
                   ))}

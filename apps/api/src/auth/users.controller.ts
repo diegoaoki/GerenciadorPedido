@@ -12,6 +12,7 @@ import { IsEnum } from 'class-validator';
 import { UserStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminGuard } from './admin.guard';
+import { AuthService } from './auth.service';
 
 class UpdateStatusDto {
   @IsEnum(UserStatus)
@@ -23,7 +24,10 @@ class UpdateStatusDto {
 @UseGuards(AdminGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auth: AuthService,
+  ) {}
 
   @Get()
   list() {
@@ -35,9 +39,22 @@ export class UsersController {
         email: true,
         role: true,
         status: true,
+        mustChangePassword: true,
         createdAt: true,
       },
     });
+  }
+
+  /** Reseta a senha: gera temporária e obriga troca no próximo login. */
+  @Patch(':id/reset-password')
+  resetPassword(@Param('id') id: string) {
+    return this.auth.resetPassword(id);
+  }
+
+  /** Marca o usuário para trocar a senha no próximo login. */
+  @Patch(':id/require-password-change')
+  requirePasswordChange(@Param('id') id: string) {
+    return this.auth.requirePasswordChange(id);
   }
 
   /** Aprovar (ACTIVE) ou bloquear (BLOCKED) um usuário. */

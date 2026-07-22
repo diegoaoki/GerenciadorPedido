@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -64,7 +65,55 @@ export class AuthService {
       email: user.email,
       role: user.role,
     });
-    return { token, email: user.email, name: user.name, role: user.role };
+    return {
+      token,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      mustChangePassword: user.mustChangePassword,
+    };
+  }
+
+  /** Usuário logado troca a própria senha (valida a atual). */
+  async changePassword(userId: string, current: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !(await bcrypt.compare(current, user.passwordHash))) {
+      throw new UnauthorizedException('Senha atual incorreta');
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: await bcrypt.hash(newPassword, 10),
+        mustChangePassword: false,
+      },
+    });
+    return { changed: true };
+  }
+
+  /** Admin reseta a senha de um usuário → senha temporária + troca obrigatória. */
+  async resetPassword(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('Usuário não encontrado');
+
+    const tempPassword = randomBytes(6).toString('base64url');
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: await bcrypt.hash(tempPassword, 10),
+        mustChangePassword: true,
+      },
+    });
+    return { email: user.email, tempPassword };
+  }
+
+  /** Admin marca o usuário para trocar a senha no próximo login. */
+  async requirePasswordChange(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { mustChangePassword: true },
+    });
+    return { required: true };
   }
 
   /** Cadastro público — conta criada como PENDING. */

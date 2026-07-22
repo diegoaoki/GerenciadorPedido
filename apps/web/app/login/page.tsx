@@ -14,12 +14,13 @@ export default function LoginPage() {
     setLoading(true);
     setErr(null);
     try {
-      const res = await api.post<{ token: string; role: string }>('/auth/login', {
-        email,
-        password,
-      });
+      const res = await api.post<{
+        token: string;
+        role: string;
+        mustChangePassword?: boolean;
+      }>('/auth/login', { email, password });
       auth.setSession(res.token, res.role);
-      window.location.href = '/';
+      window.location.href = res.mustChangePassword ? '/trocar-senha?obrigatorio=1' : '/';
     } catch (ex) {
       const msg = (ex as Error).message;
       if (msg.includes('401')) setErr('E-mail ou senha inválidos.');
