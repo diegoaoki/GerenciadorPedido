@@ -7,5 +7,11 @@
       "config": { "includeFiles": ["prisma/**"] }
     }
   ],
-  "routes": [{ "src": "/(.*)", "dest": "api/index.ts" }]
+  "routes": [{ "src": "/(.*)", "dest": "api/index.ts" }],
+  "crons": [
+    {
+      "path": "/api/cron/import-orders",
+      "schedule": "0 9 * * *"
+    }
+  ]
 }

@@ -50,12 +50,13 @@ export default function MarketplacesPage() {
 
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  async function connectMl(accountId: string) {
+  async function connect(accountId: string, marketplace: string) {
+    const path = marketplace === 'SHOPEE' ? 'shopee' : 'mercado-livre';
     try {
       const { url } = await api.get<{ url: string }>(
-        `/marketplaces/mercado-livre/connect/${accountId}`,
+        `/marketplaces/${path}/connect/${accountId}`,
       );
-      window.open(url, '_blank'); // usuário autoriza na aba do ML
+      window.open(url, '_blank'); // usuário autoriza na aba do marketplace
     } catch (e) {
       setFeedback((e as Error).message);
     }
@@ -148,9 +149,9 @@ export default function MarketplacesPage() {
               </div>
 
               <div className="mt-4 flex gap-2 border-t border-slate-100 pt-3">
-                {a.marketplace === 'MERCADO_LIVRE' && (
+                {(a.marketplace === 'MERCADO_LIVRE' || a.marketplace === 'SHOPEE') && (
                   <button
-                    onClick={() => connectMl(a.id)}
+                    onClick={() => connect(a.id, a.marketplace)}
                     className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
                   >
                     🔗 Conectar

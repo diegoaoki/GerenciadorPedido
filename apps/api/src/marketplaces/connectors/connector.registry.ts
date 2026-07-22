@@ -5,6 +5,7 @@ import { MercadoLivreConnector } from './mercado-livre.connector';
 import { ShopeeConnector } from './shopee.connector';
 import { AmazonConnector } from './amazon.connector';
 import { MagaluConnector } from './magalu.connector';
+import { AmericanasConnector } from './americanas.connector';
 
 /**
  * Localiza o conector certo para um marketplace. É o único lugar que
@@ -19,9 +20,10 @@ export class ConnectorRegistry {
     shopee: ShopeeConnector,
     amazon: AmazonConnector,
     magalu: MagaluConnector,
+    americanas: AmericanasConnector,
   ) {
     this.connectors = new Map(
-      [ml, shopee, amazon, magalu].map((c) => [c.marketplace, c]),
+      [ml, shopee, amazon, magalu, americanas].map((c) => [c.marketplace, c]),
     );
   }
 

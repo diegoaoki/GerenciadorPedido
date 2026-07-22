@@ -2,6 +2,7 @@ import { Body, Controller, Get, Header, Param, Post, Query } from '@nestjs/commo
 import { ApiTags } from '@nestjs/swagger';
 import { MarketplacesService } from './marketplaces.service';
 import { MercadoLivreOAuthService } from './mercado-livre-oauth.service';
+import { ShopeeOAuthService } from './shopee-oauth.service';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { Public } from '../auth/public.decorator';
 
@@ -11,7 +12,37 @@ export class MarketplacesController {
   constructor(
     private readonly marketplaces: MarketplacesService,
     private readonly mlOAuth: MercadoLivreOAuthService,
+    private readonly shopeeOAuth: ShopeeOAuthService,
   ) {}
+
+  /** URL de autorização para conectar uma loja Shopee. */
+  @Get('shopee/connect/:accountId')
+  shopeeConnect(@Param('accountId') accountId: string) {
+    return this.shopeeOAuth.connectUrl(accountId);
+  }
+
+  /** Retorno da autorização Shopee. Público: o navegador chega sem token. */
+  @Public()
+  @Get('shopee/callback')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  async shopeeCallback(
+    @Query('code') code: string,
+    @Query('shop_id') shopId: string,
+    @Query('accountId') accountId: string,
+  ) {
+    try {
+      const result = await this.shopeeOAuth.handleCallback(code, shopId, accountId);
+      return `<html><body style="font-family:sans-serif;text-align:center;padding-top:4rem">
+        <h2>✅ Loja Shopee conectada!</h2>
+        <p>Shop ID: ${result.shopId}</p>
+        <p>Pode fechar esta janela e voltar ao painel.</p>
+      </body></html>`;
+    } catch (e) {
+      return `<html><body style="font-family:sans-serif;text-align:center;padding-top:4rem">
+        <h2>❌ Falha ao conectar</h2><p>${(e as Error).message}</p>
+      </body></html>`;
+    }
+  }
 
   /** URL de autorização para conectar uma conta do Mercado Livre. */
   @Get('mercado-livre/connect/:accountId')
