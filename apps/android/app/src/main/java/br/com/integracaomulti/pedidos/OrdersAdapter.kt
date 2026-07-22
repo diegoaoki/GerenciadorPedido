@@ -1,5 +1,6 @@
 package br.com.integracaomulti.pedidos
 
+import android.content.Intent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -42,6 +43,14 @@ class OrdersAdapter : RecyclerView.Adapter<OrdersAdapter.Holder>() {
             "${o.marketplace.replace('_', ' ')} · ${o.buyerName}$date"
         holder.items.text = o.itemsSummary
         holder.status.text = o.status
+
+        // Toque abre o detalhe (itens, personalizações, mudar status)
+        holder.itemView.setOnClickListener {
+            val ctx = holder.itemView.context
+            val intent = Intent(ctx, OrderDetailActivity::class.java)
+            intent.putExtra(OrderDetailActivity.EXTRA_ORDER_ID, o.id)
+            ctx.startActivity(intent)
+        }
     }
 
     private fun formatDate(iso: String): String = try {

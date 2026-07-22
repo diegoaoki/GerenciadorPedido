@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { Marketplace, OrderStatus } from '@prisma/client';
@@ -45,6 +45,12 @@ export class OrdersController {
 
   @Patch(':id/status')
   updateStatus(@Param('id') id: string, @Body() dto: UpdateStatusDto) {
+    return this.orders.updateStatus(id, dto.status, dto.trackingCode);
+  }
+
+  /** Alias POST (clientes sem suporte a PATCH, ex.: HttpURLConnection). */
+  @Post(':id/status')
+  updateStatusPost(@Param('id') id: string, @Body() dto: UpdateStatusDto) {
     return this.orders.updateStatus(id, dto.status, dto.trackingCode);
   }
 }

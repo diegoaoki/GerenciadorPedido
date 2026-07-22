@@ -21,6 +21,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".OrderDetailActivity"
+            android:exported="false"
+            android:label="Pedido" />
+
         <service
             android:name=".OrderPollingService"
             android:foregroundServiceType="dataSync"

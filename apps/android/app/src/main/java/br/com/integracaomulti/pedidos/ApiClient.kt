@@ -18,6 +18,25 @@ data class OrderUi(
     val itemsSummary: String,
 )
 
+data class OrderItemDetail(
+    val title: String,
+    val sku: String,
+    val quantity: Int,
+    val attributes: String,
+    val options: List<Pair<String, String>>, // nome → valor da personalização
+)
+
+data class OrderDetail(
+    val id: String,
+    val externalOrderId: String,
+    val marketplace: String,
+    val status: String,
+    val buyerName: String,
+    val grandTotal: Double,
+    val trackingCode: String?,
+    val items: List<OrderItemDetail>,
+)
+
 /**
  * Cliente mínimo da API do hub (sem dependências externas).
  * baseUrl ex.: http://10.167.92.180:3333
@@ -77,6 +96,109 @@ object ApiClient {
     }
 
     class UnauthorizedException : RuntimeException("401")
+
+    /** Request autenticado genérico com relogin automático em 401. */
+    private suspend fun authedRequest(
+        ctx: Context,
+        method: String,
+        path: String,
+        jsonBody: JSONObject? = null,
+    ): String {
+        suspend fun doCall(token: String): String = withContext(Dispatchers.IO) {
+            val url = URL("${Prefs.baseUrl(ctx).trimEnd('/')}$path")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = method
+            conn.connectTimeout = 8000
+            conn.readTimeout = 8000
+            conn.setRequestProperty("Authorization", "Bearer $token")
+            try {
+                if (jsonBody != null) {
+                    conn.doOutput = true
+                    conn.setRequestProperty("Content-Type", "application/json")
+                    conn.outputStream.use { it.write(jsonBody.toString().toByteArray()) }
+                }
+                if (conn.responseCode == 401) throw UnauthorizedException()
+                if (conn.responseCode !in 200..299) {
+                    throw RuntimeException("API respondeu HTTP ${conn.responseCode}")
+                }
+                conn.inputStream.bufferedReader().readText()
+            } finally {
+                conn.disconnect()
+            }
+        }
+
+        var token = Prefs.token(ctx) ?: relogin(ctx, Prefs.baseUrl(ctx))
+        return try {
+            doCall(token)
+        } catch (e: UnauthorizedException) {
+            token = relogin(ctx, Prefs.baseUrl(ctx))
+            doCall(token)
+        }
+    }
+
+    suspend fun fetchOrderDetail(ctx: Context, orderId: String): OrderDetail {
+        val body = authedRequest(ctx, "GET", "/api/orders/$orderId")
+        val o = JSONObject(body)
+        val itemsJson = o.optJSONArray("items")
+        val items = ArrayList<OrderItemDetail>()
+        if (itemsJson != null) {
+            for (i in 0 until itemsJson.length()) {
+                val it = itemsJson.getJSONObject(i)
+                val variant = it.optJSONObject("variant")
+                val attrs = variant?.optJSONObject("attributes")
+                val attrText = buildString {
+                    attrs?.keys()?.forEach { k ->
+                        if (isNotEmpty()) append(" · ")
+                        append("$k: ${attrs.optString(k)}")
+                    }
+                }
+                val optionsJson = it.optJSONArray("options")
+                val options = ArrayList<Pair<String, String>>()
+                if (optionsJson != null) {
+                    for (j in 0 until optionsJson.length()) {
+                        val op = optionsJson.getJSONObject(j)
+                        options.add(op.optString("name") to op.optString("value"))
+                    }
+                }
+                items.add(
+                    OrderItemDetail(
+                        title = it.optString("title"),
+                        sku = it.optString("sku"),
+                        quantity = it.optInt("quantity", 1),
+                        attributes = attrText,
+                        options = options,
+                    )
+                )
+            }
+        }
+        return OrderDetail(
+            id = o.getString("id"),
+            externalOrderId = o.optString("externalOrderId", "?"),
+            marketplace = o.optString("marketplace", "?"),
+            status = o.optString("status", "?"),
+            buyerName = o.optString("buyerName").ifBlank { "Cliente" },
+            grandTotal = o.optDouble("grandTotal", 0.0),
+            trackingCode = o.optString("trackingCode").ifBlank { null },
+            items = items,
+        )
+    }
+
+    /** Atualiza o status; retorna aviso do marketplace se houver. */
+    suspend fun updateStatus(
+        ctx: Context,
+        orderId: String,
+        status: String,
+        trackingCode: String?,
+    ): String? {
+        val payload = JSONObject().put("status", status)
+        if (!trackingCode.isNullOrBlank()) payload.put("trackingCode", trackingCode)
+        // HttpURLConnection não suporta PATCH — a API aceita POST na mesma rota.
+        val body = authedRequest(ctx, "POST", "/api/orders/$orderId/status", payload)
+        val sync = JSONObject(body).optJSONObject("marketplaceSync")
+        return if (sync != null && !sync.optBoolean("ok", true)) {
+            sync.optString("error", "falha ao avisar o marketplace")
+        } else null
+    }
 
     suspend fun fetchOrders(baseUrl: String, token: String?, take: Int = 50): List<OrderUi> =
         withContext(Dispatchers.IO) {
