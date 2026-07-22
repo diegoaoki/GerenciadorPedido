@@ -62,6 +62,18 @@ enum StockMovementType {
   RELEASE
 }
 
+/// Como o item é entregue.
+enum FulfillmentType {
+  STOCK         // peça pronta na prateleira (estoque físico limita a venda)
+  MADE_TO_ORDER // produzido após a venda, com prazo de produção (sem limite)
+}
+
+/// Tipo de opção configurável de um produto.
+enum ProductOptionType {
+  TEXT   // cliente digita um valor (ex.: nome estampado) — vira instrução de produção
+  SELECT // cliente escolhe entre alternativas, cada uma pode somar ao preço
+}
+
 // ============================================================
 // Catálogo
 // ============================================================
@@ -76,13 +88,45 @@ model Product {
   ncm         String? // código fiscal BR
   status      ProductStatus @default(ACTIVE)
 
+  // Modelo de entrega. Padrão: sob encomenda com 7 dias de produção.
+  fulfillmentType FulfillmentType @default(MADE_TO_ORDER)
+  productionDays  Int             @default(7)
+
   variants ProductVariant[]
   images   ProductImage[]
+  options  ProductOption[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([status])
+}
+
+/// Opção configurável de um produto (personalização ou adicional).
+model ProductOption {
+  id        String            @id @default(cuid())
+  productId String
+  product   Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String // ex.: "Nome estampado", "Moldura"
+  type      ProductOptionType
+  required  Boolean           @default(false)
+  position  Int               @default(0)
+
+  choices ProductOptionChoice[]
+
+  @@index([productId])
+}
+
+/// Alternativa de uma opção do tipo SELECT (pode somar ao preço).
+model ProductOptionChoice {
+  id            String        @id @default(cuid())
+  optionId      String
+  option        ProductOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  label         String // ex.: "Moldura de madeira"
+  priceModifier Decimal       @default(0) @db.Decimal(12, 2)
+  position      Int           @default(0)
+
+  @@index([optionId])
 }
 
 /// Variação vendável. É a unidade real de estoque, preço e anúncio.
@@ -256,8 +300,24 @@ model OrderItem {
   sku       String
   title     String
   quantity  Int
-  unitPrice Decimal @db.Decimal(12, 2)
+  unitPrice Decimal @db.Decimal(12, 2) // preço base unitário (sem adicionais)
+
+  options OrderItemOption[]
 
   @@index([orderId])
   @@index([variantId])
+}
+
+/// Opção escolhida pelo cliente para um item do pedido — vira instrução
+/// de produção. Snapshot: guarda nome/valor mesmo se o produto mudar.
+model OrderItemOption {
+  id          String    @id @default(cuid())
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  name          String // ex.: "Nome estampado"
+  value         String // texto digitado ou rótulo da escolha
+  priceModifier Decimal @default(0) @db.Decimal(12, 2)
+
+  @@index([orderItemId])
 }

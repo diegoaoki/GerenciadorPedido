@@ -1,12 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { StockMovementType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { availableForSale } from '../common/fulfillment';
 
 @Injectable()
 export class InventoryService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** available = quantity - reserved */
+  /** available = quantity - reserved (apenas para itens de estoque físico) */
   private available(inv: { quantity: number; reserved: number }) {
     return inv.quantity - inv.reserved;
   }
@@ -14,16 +15,18 @@ export class InventoryService {
   async getBySku(sku: string) {
     const variant = await this.prisma.productVariant.findUnique({
       where: { sku },
-      include: { inventory: true },
+      include: { inventory: true, product: true },
     });
-    if (!variant?.inventory)
-      throw new NotFoundException(`Estoque do SKU ${sku} não encontrado`);
+    if (!variant)
+      throw new NotFoundException(`SKU ${sku} não encontrado`);
     return {
       sku,
       variantId: variant.id,
-      quantity: variant.inventory.quantity,
-      reserved: variant.inventory.reserved,
-      available: this.available(variant.inventory),
+      fulfillmentType: variant.product.fulfillmentType,
+      productionDays: variant.product.productionDays,
+      quantity: variant.inventory?.quantity ?? 0,
+      reserved: variant.inventory?.reserved ?? 0,
+      available: availableForSale(variant.product.fulfillmentType, variant.inventory),
     };
   }
 
@@ -102,9 +105,11 @@ export class InventoryService {
       sku: v.sku,
       product: v.product.title,
       attributes: v.attributes,
+      fulfillmentType: v.product.fulfillmentType,
+      productionDays: v.product.productionDays,
       quantity: v.inventory?.quantity ?? 0,
       reserved: v.inventory?.reserved ?? 0,
-      available: v.inventory ? this.available(v.inventory) : 0,
+      available: availableForSale(v.product.fulfillmentType, v.inventory),
     }));
   }
 }

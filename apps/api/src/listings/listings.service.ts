@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConnectorRegistry } from '../marketplaces/connectors/connector.registry';
+import { availableForSale } from '../common/fulfillment';
 
 @Injectable()
 export class ListingsService {
@@ -45,7 +46,7 @@ export class ListingsService {
         account: true,
         variant: {
           include: {
-            product: { include: { images: true } },
+            product: { include: { images: true, options: { include: { choices: true } } } },
             inventory: true,
           },
         },
@@ -55,9 +56,9 @@ export class ListingsService {
 
     const connector = this.registry.get(listing.marketplace);
     const { variant } = listing;
+    const { product } = variant;
     const price = Number(listing.price ?? variant.basePrice);
-    const available =
-      (variant.inventory?.quantity ?? 0) - (variant.inventory?.reserved ?? 0);
+    const available = availableForSale(product.fulfillmentType, variant.inventory);
 
     await this.prisma.listing.update({
       where: { id: listingId },
@@ -69,13 +70,23 @@ export class ListingsService {
         accountId: listing.accountId,
         credentials: (listing.account.credentials as Record<string, unknown>) ?? {},
       },
-      title: variant.product.title,
-      description: variant.product.description ?? undefined,
+      title: product.title,
+      description: product.description ?? undefined,
       sku: variant.sku,
       price,
       quantity: Math.max(0, available),
-      images: variant.product.images.map((i) => i.url),
+      handlingDays: product.productionDays,
+      images: product.images.map((i) => i.url),
       attributes: variant.attributes as Record<string, unknown>,
+      options: product.options.map((o) => ({
+        name: o.name,
+        type: o.type,
+        required: o.required,
+        choices: o.choices.map((c) => ({
+          label: c.label,
+          priceModifier: Number(c.priceModifier),
+        })),
+      })),
     });
 
     return this.prisma.listing.update({

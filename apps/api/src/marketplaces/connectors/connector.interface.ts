@@ -39,8 +39,19 @@ export interface PublishListingInput {
   sku: string;
   price: number;
   quantity: number;
+  /** Prazo de produção/manuseio em dias (tempo até despachar). */
+  handlingDays: number;
   images: string[];
   attributes: Record<string, unknown>;
+  /** Opções configuráveis do produto (personalização/adicionais). */
+  options?: PublishListingOption[];
+}
+
+export interface PublishListingOption {
+  name: string;
+  type: 'TEXT' | 'SELECT';
+  required: boolean;
+  choices?: { label: string; priceModifier: number }[];
 }
 
 /** Pedido já traduzido para o formato unificado do hub. */

@@ -3,6 +3,7 @@ import { Marketplace, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConnectorRegistry } from './connectors/connector.registry';
 import { ConnectorContext } from './connectors/connector.interface';
+import { availableForSale } from '../common/fulfillment';
 
 @Injectable()
 export class MarketplacesService {
@@ -58,13 +59,19 @@ export class MarketplacesService {
   async syncStockForVariant(variantId: string) {
     const variant = await this.prisma.productVariant.findUnique({
       where: { id: variantId },
-      include: { inventory: true, listings: { include: { account: true } } },
+      include: {
+        inventory: true,
+        product: true,
+        listings: { include: { account: true } },
+      },
     });
 
     if (!variant) throw new NotFoundException(`Variação ${variantId} não encontrada`);
 
-    const available =
-      (variant.inventory?.quantity ?? 0) - (variant.inventory?.reserved ?? 0);
+    const available = availableForSale(
+      variant.product.fulfillmentType,
+      variant.inventory,
+    );
 
     const results = [];
     for (const listing of variant.listings) {

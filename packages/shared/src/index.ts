@@ -23,6 +23,17 @@ export const MARKETPLACE_LABELS: Record<Marketplace, string> = {
 
 export type ProductStatus = 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
 
+export type FulfillmentType = 'STOCK' | 'MADE_TO_ORDER';
+
+export type ProductOptionType = 'TEXT' | 'SELECT';
+
+/**
+ * Disponibilidade "virtual" anunciada para itens sob encomenda.
+ * Como não há limite de produção, publicamos um número alto e deixamos
+ * o prazo de produção (productionDays) informar o tempo de manuseio.
+ */
+export const MTO_VIRTUAL_AVAILABILITY = 999;
+
 export type ListingStatus =
   | 'DRAFT' // criado no hub, ainda não publicado
   | 'PUBLISHING' // enviando ao marketplace
