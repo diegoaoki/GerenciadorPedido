@@ -24,6 +24,17 @@ export interface MarketplaceConnector {
 
   /** Busca pedidos novos/atualizados desde uma data. */
   fetchOrders(since: Date, ctx: ConnectorContext): Promise<ConnectorResult<NormalizedOrder[]>>;
+
+  /**
+   * Informa ao marketplace uma mudança de status do pedido feita no hub
+   * (ex.: SHIPPED com código de rastreio).
+   */
+  updateOrderStatus(
+    externalOrderId: string,
+    status: string,
+    trackingCode: string | undefined,
+    ctx: ConnectorContext,
+  ): Promise<ConnectorResult>;
 }
 
 /** Credenciais/tokens da conta conectada, repassados a cada chamada. */

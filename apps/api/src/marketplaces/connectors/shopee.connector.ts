@@ -150,6 +150,39 @@ export class ShopeeConnector extends BaseConnector {
     }
   }
 
+  /** Marca o pedido como enviado na Shopee (dropoff com rastreio). */
+  override async updateOrderStatus(
+    externalOrderId: string,
+    status: string,
+    trackingCode: string | undefined,
+    ctx: ConnectorContext,
+  ): Promise<ConnectorResult> {
+    if (status !== 'SHIPPED') {
+      return { ok: true, data: { skipped: `status ${status} não é enviado à Shopee` } };
+    }
+    const path = '/api/v2/logistics/ship_order';
+    const params = this.shopParams(ctx, path);
+    if ('error' in params) return { ok: false, error: params.error };
+
+    try {
+      const res = await fetch(`${this.baseUrl}${path}?${params.query}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_sn: externalOrderId,
+          dropoff: trackingCode ? { tracking_no: trackingCode } : {},
+        }),
+      });
+      const data = (await res.json()) as { error?: string; message?: string };
+      if (data.error) {
+        return { ok: false, error: `Shopee: ${data.error} ${data.message ?? ''}` };
+      }
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  }
+
   override async updateStock(
     externalListingId: string,
     quantity: number,

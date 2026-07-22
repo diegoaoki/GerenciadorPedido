@@ -112,6 +112,52 @@ export class MarketplacesService {
     return { variantId, available, results };
   }
 
+  // ---- Status de volta ao marketplace --------------------------------
+
+  /**
+   * Empurra uma mudança de status feita no hub para o marketplace de
+   * origem do pedido (ex.: SHIPPED com rastreio).
+   */
+  async pushOrderStatus(orderId: string, status: string, trackingCode?: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { account: true },
+    });
+    if (!order) throw new NotFoundException(`Pedido ${orderId} não encontrado`);
+
+    const connector = this.registry.get(order.marketplace);
+
+    let ctx: ConnectorContext;
+    try {
+      if (order.marketplace === 'MERCADO_LIVRE') {
+        ctx = {
+          accountId: order.accountId,
+          credentials: await this.mlOAuth.ensureFreshToken(order.accountId),
+        };
+      } else if (order.marketplace === 'SHOPEE') {
+        ctx = {
+          accountId: order.accountId,
+          credentials: await this.shopeeOAuth.ensureFreshToken(order.accountId),
+        };
+      } else {
+        ctx = {
+          accountId: order.accountId,
+          credentials:
+            (order.account.credentials as Record<string, unknown>) ?? {},
+        };
+      }
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+
+    return connector.updateOrderStatus(
+      order.externalOrderId,
+      status,
+      trackingCode,
+      ctx,
+    );
+  }
+
   // ---- Importação de pedidos ---------------------------------------
 
   /**

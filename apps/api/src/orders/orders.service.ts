@@ -1,10 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Marketplace, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { MarketplacesService } from '../marketplaces/marketplaces.service';
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(OrdersService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly marketplaces: MarketplacesService,
+  ) {}
 
   async list(params: {
     status?: OrderStatus;
@@ -50,10 +56,32 @@ export class OrdersService {
 
   async updateStatus(id: string, status: OrderStatus, trackingCode?: string) {
     await this.get(id);
-    return this.prisma.order.update({
+    const order = await this.prisma.order.update({
       where: { id },
       data: { status, ...(trackingCode ? { trackingCode } : {}) },
     });
+
+    // Empurra a mudança para o marketplace de origem (não bloqueia o hub
+    // se o marketplace falhar — o resultado volta como aviso).
+    let marketplaceSync: { ok: boolean; error?: string } = { ok: true };
+    if (status === 'SHIPPED' || status === 'DELIVERED') {
+      try {
+        marketplaceSync = await this.marketplaces.pushOrderStatus(
+          id,
+          status,
+          trackingCode,
+        );
+      } catch (e) {
+        marketplaceSync = { ok: false, error: (e as Error).message };
+      }
+      if (!marketplaceSync.ok) {
+        this.logger.warn(
+          `Pedido ${order.externalOrderId}: status local atualizado, mas o marketplace respondeu: ${marketplaceSync.error}`,
+        );
+      }
+    }
+
+    return { ...order, marketplaceSync };
   }
 
   /** KPIs para o topo do painel. */

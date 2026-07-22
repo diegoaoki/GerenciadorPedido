@@ -25,7 +25,21 @@ export default function PedidosPage() {
   }, [filter]);
 
   async function changeStatus(id: string, status: string) {
-    await api.patch(`/orders/${id}/status`, { status });
+    let trackingCode: string | undefined;
+    if (status === 'SHIPPED') {
+      trackingCode =
+        window.prompt('Código de rastreio (deixe vazio se não tiver):')?.trim() ||
+        undefined;
+    }
+    const res = await api.patch<{ marketplaceSync?: { ok: boolean; error?: string } }>(
+      `/orders/${id}/status`,
+      { status, trackingCode },
+    );
+    if (res.marketplaceSync && !res.marketplaceSync.ok) {
+      alert(
+        `Status atualizado no hub, mas o marketplace respondeu:\n${res.marketplaceSync.error}`,
+      );
+    }
     load();
   }
 

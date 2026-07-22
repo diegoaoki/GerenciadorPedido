@@ -112,6 +112,57 @@ export class AmericanasConnector extends BaseConnector {
     }
   }
 
+  /** Informa envio (com rastreio) ou entrega ao Skyhub. */
+  override async updateOrderStatus(
+    externalOrderId: string,
+    status: string,
+    trackingCode: string | undefined,
+    ctx: ConnectorContext,
+  ): Promise<ConnectorResult> {
+    const headers = this.headers(ctx);
+    if (!headers) return { ok: false, error: 'Conta Americanas não conectada' };
+
+    try {
+      if (status === 'SHIPPED') {
+        const res = await fetch(
+          `${this.baseUrl}/orders/${externalOrderId}/shipments`,
+          {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              shipment: {
+                code: trackingCode ?? externalOrderId,
+                track: {
+                  code: trackingCode ?? '',
+                  carrier: 'CORREIOS',
+                },
+              },
+            }),
+          },
+        );
+        if (!res.ok) {
+          return { ok: false, error: `Skyhub ${res.status}: ${await res.text()}` };
+        }
+        return { ok: true };
+      }
+
+      if (status === 'DELIVERED') {
+        const res = await fetch(
+          `${this.baseUrl}/orders/${externalOrderId}/delivery`,
+          { method: 'POST', headers },
+        );
+        if (!res.ok) {
+          return { ok: false, error: `Skyhub ${res.status}: ${await res.text()}` };
+        }
+        return { ok: true };
+      }
+
+      return { ok: true, data: { skipped: `status ${status} não é enviado ao Skyhub` } };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  }
+
   override async updateStock(
     externalListingId: string,
     quantity: number,

@@ -157,6 +157,61 @@ export class MercadoLivreConnector extends BaseConnector {
     }
   }
 
+  /**
+   * Informa envio ao ML (pedidos com logística própria/custom).
+   * Nota: pedidos com Mercado Envios (ME2) têm o status gerenciado pelo
+   * próprio ML — nesses casos a chamada é ignorada pelo marketplace.
+   * Validar o fluxo completo quando as credenciais forem ativadas.
+   */
+  override async updateOrderStatus(
+    externalOrderId: string,
+    status: string,
+    trackingCode: string | undefined,
+    ctx: ConnectorContext,
+  ): Promise<ConnectorResult> {
+    if (status !== 'SHIPPED') {
+      return { ok: true, data: { skipped: `status ${status} não é enviado ao ML` } };
+    }
+    const token = this.token(ctx);
+    if (!token) return { ok: false, error: 'Sem access_token do Mercado Livre' };
+
+    try {
+      // 1. Descobre o shipment do pedido
+      const orderRes = await fetch(`${this.baseUrl}/orders/${externalOrderId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!orderRes.ok) {
+        return { ok: false, error: `ML ${orderRes.status}: ${await orderRes.text()}` };
+      }
+      const order = (await orderRes.json()) as {
+        shipping?: { id?: number };
+      };
+      const shipmentId = order.shipping?.id;
+      if (!shipmentId) {
+        return { ok: false, error: 'Pedido sem shipment associado no ML' };
+      }
+
+      // 2. Atualiza o shipment (logística custom) com rastreio
+      const res = await fetch(`${this.baseUrl}/shipments/${shipmentId}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'shipped',
+          ...(trackingCode ? { tracking_number: trackingCode } : {}),
+        }),
+      });
+      if (!res.ok) {
+        return { ok: false, error: `ML shipments ${res.status}: ${await res.text()}` };
+      }
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  }
+
   // publishListing do ML exige mapear categorias e atributos obrigatórios —
   // próximo passo quando as credenciais estiverem configuradas.
 }

@@ -58,4 +58,13 @@ export abstract class BaseConnector implements MarketplaceConnector {
   ): Promise<ConnectorResult<NormalizedOrder[]>> {
     return { ok: true, data: [] };
   }
+
+  async updateOrderStatus(
+    _externalOrderId: string,
+    _status: string,
+    _trackingCode: string | undefined,
+    _ctx: ConnectorContext,
+  ): Promise<ConnectorResult> {
+    return this.notImplemented('updateOrderStatus');
+  }
 }
