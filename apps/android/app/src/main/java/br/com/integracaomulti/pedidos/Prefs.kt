@@ -7,7 +7,7 @@ object Prefs {
     private const val FILE = "pedidos_hub"
     private const val KEY_BASE_URL = "base_url"
     private const val KEY_KNOWN_IDS = "known_order_ids"
-    const val DEFAULT_BASE_URL = "http://10.167.92.180:3333"
+    const val DEFAULT_BASE_URL = "https://integracao-api-six.vercel.app"
 
     fun baseUrl(ctx: Context): String =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
