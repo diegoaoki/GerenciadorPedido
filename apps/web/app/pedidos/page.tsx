@@ -80,7 +80,7 @@ export default function PedidosPage() {
                 ))}
               </div>
 
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex items-center gap-3">
                 <span className="text-xs text-slate-400">Alterar status:</span>
                 <select
                   value={o.status}
@@ -93,6 +93,12 @@ export default function PedidosPage() {
                     </option>
                   ))}
                 </select>
+                <a
+                  href={`/pedidos/${o.id}/ficha`}
+                  className="text-xs font-medium text-brand hover:underline"
+                >
+                  🖨️ Ficha de produção
+                </a>
               </div>
             </Card>
           ))}

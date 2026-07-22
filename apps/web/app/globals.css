@@ -9,3 +9,17 @@
 body {
   @apply bg-slate-50 text-slate-800 antialiased;
 }
+
+/* Impressão: só o conteúdo (ficha de produção etc.), sem menu */
+@media print {
+  aside {
+    display: none !important;
+  }
+  main {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  body {
+    background: white;
+  }
+}

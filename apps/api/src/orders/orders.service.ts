@@ -34,7 +34,15 @@ export class OrdersService {
   async get(id: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: { items: { include: { variant: true } }, account: true },
+      include: {
+        items: {
+          include: {
+            variant: { include: { product: true } },
+            options: true,
+          },
+        },
+        account: true,
+      },
     });
     if (!order) throw new NotFoundException(`Pedido ${id} não encontrado`);
     return order;
