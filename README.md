@@ -25,7 +25,9 @@ criar um conector, sem tocar no resto.
 ## Requisitos
 
 - Node.js 20+
-- Docker Desktop (para o PostgreSQL) — ou SQLite como fallback (ver abaixo)
+- PostgreSQL — via Docker Desktop (recomendado) **ou** um Postgres hospedado
+  gratuito (Neon / Supabase). O schema usa recursos exclusivos do Postgres,
+  então SQLite não é suportado.
 
 ## Como rodar (desenvolvimento)
 
@@ -50,10 +52,17 @@ cd ../.. && npm run api:dev
 
 API em `http://localhost:3333/api` · documentação interativa em `/docs`.
 
-### Sem Docker (fallback SQLite)
+### Sem Docker
 
-Em `apps/api/prisma/schema.prisma`, troque `provider = "postgresql"` por
-`provider = "sqlite"` e use `DATABASE_URL="file:./dev.db"` no `.env`.
+Use um Postgres hospedado gratuito (Neon / Supabase): crie o banco, cole a
+connection string em `apps/api/.env` (`DATABASE_URL=...`) e pule o passo 3.
+Os demais passos (migrate, seed, dev) são idênticos.
+
+### Rodar o painel web
+
+```bash
+npm run web:dev   # painel em http://localhost:3000
+```
 
 ## Marketplaces suportados
 
