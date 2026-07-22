@@ -11,6 +11,7 @@ const NAV = [
   { href: '/estoque', label: 'Estoque', icon: '🔢' },
   { href: '/pedidos', label: 'Pedidos', icon: '🧾' },
   { href: '/marketplaces', label: 'Marketplaces', icon: '🔌' },
+  { href: '/relatorios', label: 'Relatórios', icon: '📈' },
   { href: '/usuarios', label: 'Usuários', icon: '👤', adminOnly: true },
 ];
 
