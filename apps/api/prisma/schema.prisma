@@ -1,0 +1,263 @@
+// Modelo de domínio do hub de integração multiplataforma.
+//
+// Conceito central:
+//   Product (produto-pai) → Variant (SKU vendável, com estoque próprio)
+//   Variant ↔ Marketplace = Listing (anúncio, com ID externo)
+//   Pedidos de qualquer marketplace entram como Order unificado.
+//
+// Para rodar SEM Docker: troque provider por "sqlite" e ajuste DATABASE_URL
+// para "file:./dev.db" (ver .env.example).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Enums
+// ============================================================
+
+enum Marketplace {
+  MERCADO_LIVRE
+  SHOPEE
+  AMAZON
+  MAGALU
+  AMERICANAS
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ListingStatus {
+  DRAFT
+  PUBLISHING
+  ACTIVE
+  PAUSED
+  ERROR
+  CLOSED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum StockMovementType {
+  INBOUND
+  OUTBOUND
+  ADJUSTMENT
+  RESERVATION
+  RELEASE
+}
+
+// ============================================================
+// Catálogo
+// ============================================================
+
+/// Produto-pai. Agrupa variações (tamanho, cor, etc.).
+model Product {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  brand       String?
+  category    String?
+  ncm         String? // código fiscal BR
+  status      ProductStatus @default(ACTIVE)
+
+  variants ProductVariant[]
+  images   ProductImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+/// Variação vendável. É a unidade real de estoque, preço e anúncio.
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  sku        String  @unique // SKU interno (fonte da verdade)
+  ean        String? // código de barras
+  // Atributos da variação, ex.: { "tamanho": "M", "cor": "Azul" }
+  attributes Json    @default("{}")
+
+  basePrice   Decimal  @db.Decimal(12, 2)
+  costPrice   Decimal? @db.Decimal(12, 2)
+  weightGrams Int?
+  lengthCm    Decimal? @db.Decimal(8, 2)
+  widthCm     Decimal? @db.Decimal(8, 2)
+  heightCm    Decimal? @db.Decimal(8, 2)
+
+  inventory      Inventory?
+  listings       Listing[]
+  orderItems     OrderItem[]
+  stockMovements StockMovement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  position  Int     @default(0)
+
+  @@index([productId])
+}
+
+// ============================================================
+// Estoque unificado
+// ============================================================
+
+/// Estoque único por variação — a fonte da verdade que sincroniza
+/// para todos os marketplaces.
+model Inventory {
+  id        String         @id @default(cuid())
+  variantId String         @unique
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  quantity  Int @default(0) // quantidade física em estoque
+  reserved  Int @default(0) // reservado por pedidos ainda não enviados
+  // available = quantity - reserved (calculado na aplicação)
+
+  updatedAt DateTime @updatedAt
+}
+
+/// Histórico de movimentações — auditoria de tudo que mexe no estoque.
+model StockMovement {
+  id        String            @id @default(cuid())
+  variantId String
+  variant   ProductVariant    @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  type      StockMovementType
+  quantity  Int // positivo ou negativo conforme o tipo
+  reason    String?
+  orderId   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([variantId])
+  @@index([orderId])
+}
+
+// ============================================================
+// Contas de marketplace + Listings
+// ============================================================
+
+/// Uma conta conectada em um marketplace (credenciais/tokens OAuth).
+model MarketplaceAccount {
+  id          String      @id @default(cuid())
+  marketplace Marketplace
+  nickname    String // apelido dado pelo usuário
+  // Tokens/credenciais. Em produção: criptografar em repouso.
+  credentials Json        @default("{}")
+  active      Boolean     @default(true)
+
+  listings Listing[]
+  orders   Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([marketplace, nickname])
+}
+
+/// Anúncio: liga uma variação a um marketplace específico.
+model Listing {
+  id        String @id @default(cuid())
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  accountId String
+  account   MarketplaceAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  marketplace       Marketplace
+  externalListingId String? // ID do anúncio no marketplace (após publicar)
+  status            ListingStatus @default(DRAFT)
+
+  // Preço específico deste canal (se nulo, usa basePrice da variação).
+  price Decimal? @db.Decimal(12, 2)
+
+  lastSyncedAt DateTime?
+  lastError    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([variantId, accountId])
+  @@index([marketplace, status])
+}
+
+// ============================================================
+// Pedidos unificados
+// ============================================================
+
+model Order {
+  id          String      @id @default(cuid())
+  accountId   String
+  account     MarketplaceAccount @relation(fields: [accountId], references: [id])
+  marketplace Marketplace
+  externalOrderId String // número do pedido no marketplace
+
+  status OrderStatus @default(PENDING)
+
+  // Cliente (dados mínimos; LGPD: guardar só o necessário)
+  buyerName  String?
+  buyerDoc   String?
+  buyerEmail String?
+
+  // Valores
+  itemsTotal    Decimal @db.Decimal(12, 2) @default(0)
+  shippingTotal Decimal @db.Decimal(12, 2) @default(0)
+  grandTotal    Decimal @db.Decimal(12, 2) @default(0)
+
+  // Envio
+  shippingAddress Json?
+  trackingCode    String?
+
+  placedAt  DateTime // quando o pedido foi feito no marketplace
+  items     OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([marketplace, externalOrderId])
+  @@index([status])
+  @@index([placedAt])
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+
+  // Snapshot no momento da venda (o produto pode mudar depois)
+  sku       String
+  title     String
+  quantity  Int
+  unitPrice Decimal @db.Decimal(12, 2)
+
+  @@index([orderId])
+  @@index([variantId])
+}

@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: imp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: imp
+      POSTGRES_PASSWORD: imp
+      POSTGRES_DB: imp
+    ports:
+      - "5432:5432"
+    volumes:
+      - imp-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U imp -d imp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  imp-pgdata:
