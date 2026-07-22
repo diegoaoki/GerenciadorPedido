@@ -14,12 +14,19 @@ export default function LoginPage() {
     setLoading(true);
     setErr(null);
     try {
-      const res = await api.post<{ token: string }>('/auth/login', { email, password });
-      auth.setToken(res.token);
+      const res = await api.post<{ token: string; role: string }>('/auth/login', {
+        email,
+        password,
+      });
+      auth.setSession(res.token, res.role);
       window.location.href = '/';
     } catch (ex) {
       const msg = (ex as Error).message;
-      setErr(msg.includes('401') ? 'E-mail ou senha inválidos.' : msg);
+      if (msg.includes('401')) setErr('E-mail ou senha inválidos.');
+      else if (msg.includes('403') && msg.includes('aprova'))
+        setErr('Seu cadastro ainda aguarda aprovação do administrador.');
+      else if (msg.includes('403')) setErr('Acesso bloqueado. Fale com o administrador.');
+      else setErr(msg);
       setLoading(false);
     }
   }
@@ -70,6 +77,13 @@ export default function LoginPage() {
           >
             {loading ? 'Entrando…' : 'Entrar'}
           </button>
+
+          <p className="mt-4 text-center text-xs text-slate-500">
+            Não tem conta?{' '}
+            <a href="/cadastro" className="font-medium text-brand hover:underline">
+              Criar conta
+            </a>
+          </p>
         </form>
       </div>
     </div>

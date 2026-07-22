@@ -4,13 +4,20 @@
  * Anexa o JWT salvo no login; em 401 redireciona para /login.
  */
 const TOKEN_KEY = 'imp_token';
+const ROLE_KEY = 'imp_role';
 
 export const auth = {
   token: (): string | null =>
     typeof window === 'undefined' ? null : localStorage.getItem(TOKEN_KEY),
-  setToken: (t: string) => localStorage.setItem(TOKEN_KEY, t),
+  role: (): string | null =>
+    typeof window === 'undefined' ? null : localStorage.getItem(ROLE_KEY),
+  setSession: (t: string, role: string) => {
+    localStorage.setItem(TOKEN_KEY, t);
+    localStorage.setItem(ROLE_KEY, role);
+  },
   logout: () => {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(ROLE_KEY);
     window.location.href = '/login';
   },
 };

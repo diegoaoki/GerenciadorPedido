@@ -29,7 +29,9 @@ export class JwtAuthGuard implements CanActivate {
     if (!token) throw new UnauthorizedException('Token ausente');
 
     try {
-      await this.jwt.verifyAsync(token);
+      const payload = await this.jwt.verifyAsync(token);
+      // Disponibiliza o usuário autenticado para os controllers/guards.
+      (request as Request & { user?: unknown }).user = payload;
       return true;
     } catch {
       throw new UnauthorizedException('Token inválido ou expirado');

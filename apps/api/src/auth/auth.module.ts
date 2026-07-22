@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
+import { UsersController } from './users.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
@@ -14,7 +15,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
       signOptions: { expiresIn: '30d' },
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, UsersController],
   providers: [
     AuthService,
     // Guard global: protege TODAS as rotas, exceto @Public()

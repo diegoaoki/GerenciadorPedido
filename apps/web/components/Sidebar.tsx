@@ -11,20 +11,22 @@ const NAV = [
   { href: '/estoque', label: 'Estoque', icon: '🔢' },
   { href: '/pedidos', label: 'Pedidos', icon: '🧾' },
   { href: '/marketplaces', label: 'Marketplaces', icon: '🔌' },
+  { href: '/usuarios', label: 'Usuários', icon: '👤', adminOnly: true },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const isLogin = pathname === '/login';
+  const isPublic = pathname === '/login' || pathname === '/cadastro';
+  const isAdmin = typeof window !== 'undefined' && auth.role() === 'ADMIN';
 
   // Sem token → vai para o login (proteção client-side; a API valida de verdade).
   useEffect(() => {
-    if (!isLogin && !auth.token()) {
+    if (!isPublic && !auth.token()) {
       window.location.href = '/login';
     }
-  }, [isLogin]);
+  }, [isPublic]);
 
-  if (isLogin) return null;
+  if (isPublic) return null;
 
   return (
     <aside className="flex h-screen w-60 flex-col border-r border-slate-200 bg-white">
@@ -33,7 +35,7 @@ export function Sidebar() {
         <div className="text-xs text-slate-400">Multiplataforma</div>
       </div>
       <nav className="flex-1 space-y-1 px-3">
-        {NAV.map((item) => {
+        {NAV.filter((item) => !item.adminOnly || isAdmin).map((item) => {
           const active =
             item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
           return (
