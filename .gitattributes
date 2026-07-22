@@ -1,0 +1,10 @@
+# Normaliza quebras de linha: LF no repositório para código-fonte.
+* text=auto eol=lf
+
+# Binários não devem ser normalizados
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
