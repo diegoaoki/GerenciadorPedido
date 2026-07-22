@@ -1,13 +1,36 @@
 /**
  * Cliente HTTP mínimo para a API. Usa caminhos relativos (/api/...) que o
  * next.config.mjs encaminha para a API NestJS — sem CORS no desenvolvimento.
+ * Anexa o JWT salvo no login; em 401 redireciona para /login.
  */
+const TOKEN_KEY = 'imp_token';
+
+export const auth = {
+  token: (): string | null =>
+    typeof window === 'undefined' ? null : localStorage.getItem(TOKEN_KEY),
+  setToken: (t: string) => localStorage.setItem(TOKEN_KEY, t),
+  logout: () => {
+    localStorage.removeItem(TOKEN_KEY);
+    window.location.href = '/login';
+  },
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = auth.token();
   const res = await fetch(`/api${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
     cache: 'no-store',
   });
+  if (res.status === 401 && typeof window !== 'undefined' && window.location.pathname !== '/login') {
+    localStorage.removeItem(TOKEN_KEY);
+    window.location.href = '/login';
+    throw new Error('Sessão expirada');
+  }
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`API ${res.status}: ${body}`);

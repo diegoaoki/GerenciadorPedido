@@ -29,12 +29,16 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         val urlInput = findViewById<EditText>(R.id.url_input)
+        val emailInput = findViewById<EditText>(R.id.email_input)
+        val passwordInput = findViewById<EditText>(R.id.password_input)
         val saveButton = findViewById<Button>(R.id.save_url_button)
         monitorButton = findViewById(R.id.monitor_button)
         statusText = findViewById(R.id.status_text)
         swipe = findViewById(R.id.swipe)
 
         urlInput.setText(Prefs.baseUrl(this))
+        emailInput.setText(Prefs.email(this))
+        passwordInput.setText(Prefs.password(this))
 
         adapter = OrdersAdapter()
         findViewById<RecyclerView>(R.id.orders_list).apply {
@@ -44,7 +48,12 @@ class MainActivity : AppCompatActivity() {
 
         saveButton.setOnClickListener {
             Prefs.setBaseUrl(this, urlInput.text.toString())
-            Toast.makeText(this, "Servidor salvo", Toast.LENGTH_SHORT).show()
+            Prefs.setCredentials(
+                this,
+                emailInput.text.toString(),
+                passwordInput.text.toString(),
+            )
+            Toast.makeText(this, "Configuração salva", Toast.LENGTH_SHORT).show()
             refresh()
         }
 
@@ -69,7 +78,7 @@ class MainActivity : AppCompatActivity() {
         swipe.isRefreshing = true
         lifecycleScope.launch {
             try {
-                val orders = ApiClient.fetchOrders(Prefs.baseUrl(this@MainActivity))
+                val orders = ApiClient.fetchOrdersAuthed(this@MainActivity)
                 adapter.submit(orders)
                 statusText.text =
                     if (orders.isEmpty()) "Nenhum pedido ainda."

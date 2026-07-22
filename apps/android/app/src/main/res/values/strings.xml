@@ -3,5 +3,7 @@
     <string name="app_name">Pedidos Hub</string>
     <string name="server_hint">http://IP-do-PC:3333</string>
     <string name="save">Salvar</string>
+    <string name="email_hint">E-mail</string>
+    <string name="password_hint">Senha</string>
     <string name="monitor_start">▶ Monitorar novos pedidos</string>
 </resources>

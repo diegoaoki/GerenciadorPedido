@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { MarketplacesService } from './marketplaces.service';
 import { MercadoLivreOAuthService } from './mercado-livre-oauth.service';
 import { CreateAccountDto } from './dto/create-account.dto';
+import { Public } from '../auth/public.decorator';
 
 @ApiTags('marketplaces')
 @Controller('marketplaces')
@@ -18,7 +19,8 @@ export class MarketplacesController {
     return this.mlOAuth.connectUrl(accountId);
   }
 
-  /** Retorno do OAuth do ML (redirect_uri). Mostra uma página simples. */
+  /** Retorno do OAuth do ML (redirect_uri). Público: o navegador chega sem token. */
+  @Public()
   @Get('mercado-livre/callback')
   @Header('Content-Type', 'text/html; charset=utf-8')
   async mlCallback(@Query('code') code: string, @Query('state') state: string) {

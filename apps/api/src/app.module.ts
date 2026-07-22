@@ -7,11 +7,13 @@ import { ListingsModule } from './listings/listings.module';
 import { OrdersModule } from './orders/orders.module';
 import { MarketplacesModule } from './marketplaces/marketplaces.module';
 import { AiModule } from './ai/ai.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    AuthModule,
     CatalogModule,
     InventoryModule,
     ListingsModule,

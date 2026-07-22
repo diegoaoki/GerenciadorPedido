@@ -68,8 +68,7 @@ class OrderPollingService : Service() {
     }
 
     private suspend fun checkForNewOrders() {
-        val baseUrl = Prefs.baseUrl(this)
-        val orders = ApiClient.fetchOrders(baseUrl)
+        val orders = ApiClient.fetchOrdersAuthed(this)
         val known = Prefs.knownIds(this)
 
         // Primeira execução: só memoriza, não notifica tudo de uma vez.
