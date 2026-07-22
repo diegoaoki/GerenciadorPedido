@@ -94,14 +94,29 @@ model Product {
   fulfillmentType FulfillmentType @default(MADE_TO_ORDER)
   productionDays  Int             @default(7)
 
-  variants ProductVariant[]
-  images   ProductImage[]
-  options  ProductOption[]
+  variants            ProductVariant[]
+  images              ProductImage[]
+  options             ProductOption[]
+  channelDescriptions ProductChannelDescription[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([status])
+}
+
+/// Descrição específica de um produto para um marketplace.
+/// Se não existir, a publicação usa a descrição base do produto.
+model ProductChannelDescription {
+  id          String      @id @default(cuid())
+  productId   String
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  marketplace Marketplace
+  description String
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, marketplace])
 }
 
 /// Opção configurável de um produto (personalização ou adicional).

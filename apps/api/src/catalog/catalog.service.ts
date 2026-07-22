@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Marketplace, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -84,6 +84,7 @@ export class CatalogService {
           variants: { include: { inventory: true, listings: true } },
           images: { orderBy: { position: 'asc' } },
           options: { include: { choices: true }, orderBy: { position: 'asc' } },
+          channelDescriptions: true,
         },
       }),
       this.prisma.product.count({ where }),
@@ -99,6 +100,7 @@ export class CatalogService {
         variants: { include: { inventory: true, listings: true } },
         images: { orderBy: { position: 'asc' } },
         options: { include: { choices: true }, orderBy: { position: 'asc' } },
+        channelDescriptions: true,
       },
     });
     if (!product) throw new NotFoundException(`Produto ${id} não encontrado`);
@@ -114,5 +116,41 @@ export class CatalogService {
     await this.getProduct(id);
     await this.prisma.product.delete({ where: { id } });
     return { deleted: true };
+  }
+
+  /**
+   * Salva as descrições por marketplace. Texto vazio/em branco remove a
+   * descrição do canal (a publicação volta a usar a descrição base).
+   */
+  async setChannelDescriptions(
+    productId: string,
+    entries: { marketplace: Marketplace; description: string }[],
+  ) {
+    await this.getProduct(productId);
+
+    await this.prisma.$transaction(
+      entries.map((e) => {
+        const where = {
+          productId_marketplace: { productId, marketplace: e.marketplace },
+        };
+        return e.description.trim()
+          ? this.prisma.productChannelDescription.upsert({
+              where,
+              create: {
+                productId,
+                marketplace: e.marketplace,
+                description: e.description,
+              },
+              update: { description: e.description },
+            })
+          : this.prisma.productChannelDescription.deleteMany({
+              where: { productId, marketplace: e.marketplace },
+            });
+      }),
+    );
+
+    return this.prisma.productChannelDescription.findMany({
+      where: { productId },
+    });
   }
 }

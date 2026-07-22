@@ -6,12 +6,14 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CatalogService } from './catalog.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { SetChannelDescriptionsDto } from './dto/channel-descriptions.dto';
 
 @ApiTags('catalog')
 @Controller('products')
@@ -49,5 +51,13 @@ export class CatalogController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.catalog.deleteProduct(id);
+  }
+
+  @Put(':id/descriptions')
+  setDescriptions(
+    @Param('id') id: string,
+    @Body() dto: SetChannelDescriptionsDto,
+  ) {
+    return this.catalog.setChannelDescriptions(id, dto.entries);
   }
 }

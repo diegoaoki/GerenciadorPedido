@@ -46,7 +46,13 @@ export class ListingsService {
         account: true,
         variant: {
           include: {
-            product: { include: { images: true, options: { include: { choices: true } } } },
+            product: {
+              include: {
+                images: true,
+                options: { include: { choices: true } },
+                channelDescriptions: true,
+              },
+            },
             inventory: true,
           },
         },
@@ -71,7 +77,13 @@ export class ListingsService {
         credentials: (listing.account.credentials as Record<string, unknown>) ?? {},
       },
       title: product.title,
-      description: product.description ?? undefined,
+      // Descrição do canal, se cadastrada; senão a descrição base.
+      description:
+        product.channelDescriptions.find(
+          (d) => d.marketplace === listing.marketplace,
+        )?.description ??
+        product.description ??
+        undefined,
       sku: variant.sku,
       price,
       quantity: Math.max(0, available),

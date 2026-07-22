@@ -4,6 +4,14 @@ import { useEffect, useState } from 'react';
 import { api, Paginated, Product } from '@/lib/api';
 import { PageHeader, Card, Badge, brl, EmptyState } from '@/components/ui';
 
+const MARKETPLACE_LABELS: Record<string, string> = {
+  MERCADO_LIVRE: 'Mercado Livre',
+  SHOPEE: 'Shopee',
+  AMAZON: 'Amazon',
+  MAGALU: 'Magalu',
+  AMERICANAS: 'Americanas',
+};
+
 export default function ProdutosPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
@@ -132,11 +140,124 @@ export default function ProdutosPage() {
                   ))}
                 </tbody>
               </table>
+
+              <ChannelDescriptions product={p} onSaved={load} />
             </Card>
           ))}
         </div>
       )}
     </>
+  );
+}
+
+/** Editor de descrições por marketplace, com "copiar da descrição base". */
+function ChannelDescriptions({ product, onSaved }: { product: Product; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const filled = product.channelDescriptions.length;
+
+  function openEditor() {
+    // Carrega o que já existe no banco para os rascunhos.
+    const initial: Record<string, string> = {};
+    for (const m of Object.keys(MARKETPLACE_LABELS)) {
+      initial[m] =
+        product.channelDescriptions.find((d) => d.marketplace === m)?.description ?? '';
+    }
+    setDrafts(initial);
+    setOpen(true);
+  }
+
+  async function save() {
+    setSaving(true);
+    setErr(null);
+    try {
+      await api.put(`/products/${product.id}/descriptions`, {
+        entries: Object.entries(drafts).map(([marketplace, description]) => ({
+          marketplace,
+          description,
+        })),
+      });
+      setSavedMsg(true);
+      setTimeout(() => setSavedMsg(false), 2500);
+      onSaved();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={openEditor}
+        className="mt-4 text-xs font-medium text-brand hover:underline"
+      >
+        📝 Descrições por marketplace
+        {filled > 0 && ` (${filled} personalizada${filled > 1 ? 's' : ''})`}
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-sm font-semibold">Descrições por marketplace</span>
+        <button onClick={() => setOpen(false)} className="text-xs text-slate-400">
+          fechar
+        </button>
+      </div>
+
+      <div className="mb-3 rounded-md bg-white p-3 text-xs text-slate-500">
+        <span className="font-medium text-slate-600">Descrição base:</span>{' '}
+        {product.description?.trim() || <em>— produto sem descrição base —</em>}
+      </div>
+
+      <div className="space-y-3">
+        {Object.entries(MARKETPLACE_LABELS).map(([key, label]) => (
+          <div key={key}>
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-600">{label}</span>
+              <button
+                onClick={() => setDrafts((d) => ({ ...d, [key]: product.description ?? '' }))}
+                disabled={!product.description?.trim()}
+                className="text-xs text-brand hover:underline disabled:cursor-not-allowed disabled:text-slate-300"
+                title={
+                  product.description?.trim()
+                    ? 'Copiar a descrição base para este marketplace'
+                    : 'Produto sem descrição base para copiar'
+                }
+              >
+                ⧉ Copiar da base
+              </button>
+            </div>
+            <textarea
+              value={drafts[key] ?? ''}
+              onChange={(e) => setDrafts((d) => ({ ...d, [key]: e.target.value }))}
+              rows={3}
+              placeholder={`Vazio = usa a descrição base ao publicar no ${label}`}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+        ))}
+      </div>
+
+      {err && <div className="mt-2 text-xs text-red-600">{err}</div>}
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+        >
+          {saving ? 'Salvando…' : 'Salvar descrições'}
+        </button>
+        {savedMsg && <span className="text-xs text-green-600">✓ Salvo</span>}
+      </div>
+    </div>
   );
 }
 
@@ -153,6 +274,7 @@ interface DraftOption {
 
 function NewProductForm({ onCreated }: { onCreated: () => void }) {
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [brand, setBrand] = useState('');
   const [sku, setSku] = useState('');
   const [price, setPrice] = useState('');
@@ -180,6 +302,7 @@ function NewProductForm({ onCreated }: { onCreated: () => void }) {
     try {
       await api.post('/products', {
         title,
+        description: description || undefined,
         brand: brand || undefined,
         fulfillmentType: 'MADE_TO_ORDER',
         productionDays: Number(productionDays) || 7,
@@ -216,6 +339,19 @@ function NewProductForm({ onCreated }: { onCreated: () => void }) {
         <Field label="Preço (R$)" value={price} onChange={setPrice} placeholder="59.90" />
         <Field label="Prazo de produção (dias)" value={productionDays} onChange={setProductionDays} placeholder="7" />
       </div>
+
+      <label className="mt-3 block text-sm">
+        <span className="mb-1 block text-xs text-slate-500">
+          Descrição base (usada em todos os marketplaces; personalizável por canal depois)
+        </span>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          placeholder="Descreva o produto…"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+        />
+      </label>
 
       {/* Editor de opções */}
       <div className="mt-5">
