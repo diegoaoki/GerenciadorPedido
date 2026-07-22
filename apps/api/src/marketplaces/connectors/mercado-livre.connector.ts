@@ -4,7 +4,19 @@ import { BaseConnector } from './base.connector';
 import {
   ConnectorContext,
   ConnectorResult,
+  NormalizedOrder,
 } from './connector.interface';
+
+/** Status do ML → status unificado do hub. */
+const ML_STATUS_MAP: Record<string, string> = {
+  confirmed: 'PENDING',
+  payment_required: 'PENDING',
+  payment_in_process: 'PENDING',
+  paid: 'PAID',
+  shipped: 'SHIPPED',
+  delivered: 'DELIVERED',
+  cancelled: 'CANCELLED',
+};
 
 /**
  * Conector do Mercado Livre.
@@ -76,7 +88,75 @@ export class MercadoLivreConnector extends BaseConnector {
     }
   }
 
-  // publishListing e fetchOrders do ML exigem mapear categorias, atributos
-  // obrigatórios e o recurso /orders/search — próximos passos quando as
-  // credenciais estiverem configuradas. Herdam o comportamento da base.
+  /** Busca pedidos do vendedor desde `since`, já normalizados. */
+  override async fetchOrders(
+    since: Date,
+    ctx: ConnectorContext,
+  ): Promise<ConnectorResult<NormalizedOrder[]>> {
+    const token = this.token(ctx);
+    const sellerId = ctx.credentials?.user_id;
+    if (!token || !sellerId)
+      return { ok: false, error: 'Conta do Mercado Livre não conectada (sem token/seller)' };
+
+    try {
+      const url =
+        `${this.baseUrl}/orders/search?seller=${sellerId}` +
+        `&order.date_created.from=${encodeURIComponent(since.toISOString())}` +
+        `&sort=date_desc&limit=50`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        return { ok: false, error: `ML ${res.status}: ${await res.text()}` };
+      }
+
+      const data = (await res.json()) as {
+        results: Array<{
+          id: number;
+          status: string;
+          date_created: string;
+          total_amount: number;
+          paid_amount: number;
+          buyer?: { nickname?: string; first_name?: string; last_name?: string };
+          order_items: Array<{
+            item: { title: string; seller_sku?: string; id: string };
+            quantity: number;
+            unit_price: number;
+          }>;
+          shipping?: { id?: number };
+        }>;
+      };
+
+      const orders: NormalizedOrder[] = (data.results ?? []).map((o) => {
+        const itemsTotal = o.order_items.reduce(
+          (sum, it) => sum + it.unit_price * it.quantity,
+          0,
+        );
+        return {
+          externalOrderId: String(o.id),
+          status: ML_STATUS_MAP[o.status] ?? 'PENDING',
+          placedAt: new Date(o.date_created),
+          buyerName:
+            [o.buyer?.first_name, o.buyer?.last_name].filter(Boolean).join(' ') ||
+            o.buyer?.nickname,
+          itemsTotal,
+          shippingTotal: Math.max(0, (o.paid_amount ?? itemsTotal) - itemsTotal),
+          grandTotal: o.paid_amount ?? o.total_amount ?? itemsTotal,
+          items: o.order_items.map((it) => ({
+            sku: it.item.seller_sku ?? it.item.id,
+            title: it.item.title,
+            quantity: it.quantity,
+            unitPrice: it.unit_price,
+          })),
+        };
+      });
+
+      return { ok: true, data: orders };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  }
+
+  // publishListing do ML exige mapear categorias e atributos obrigatórios —
+  // próximo passo quando as credenciais estiverem configuradas.
 }

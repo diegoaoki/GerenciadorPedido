@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MarketplacesController } from './marketplaces.controller';
 import { MarketplacesService } from './marketplaces.service';
+import { MercadoLivreOAuthService } from './mercado-livre-oauth.service';
 import { ConnectorRegistry } from './connectors/connector.registry';
 import { MercadoLivreConnector } from './connectors/mercado-livre.connector';
 import { ShopeeConnector } from './connectors/shopee.connector';
@@ -11,6 +12,7 @@ import { MagaluConnector } from './connectors/magalu.connector';
   controllers: [MarketplacesController],
   providers: [
     MarketplacesService,
+    MercadoLivreOAuthService,
     ConnectorRegistry,
     MercadoLivreConnector,
     ShopeeConnector,

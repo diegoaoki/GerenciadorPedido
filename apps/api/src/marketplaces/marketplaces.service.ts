@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Marketplace, Prisma } from '@prisma/client';
+import { Marketplace, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConnectorRegistry } from './connectors/connector.registry';
 import { ConnectorContext } from './connectors/connector.interface';
+import { MercadoLivreOAuthService } from './mercado-livre-oauth.service';
 import { availableForSale } from '../common/fulfillment';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class MarketplacesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly registry: ConnectorRegistry,
+    private readonly mlOAuth: MercadoLivreOAuthService,
   ) {}
 
   supported() {
@@ -121,12 +123,25 @@ export class MarketplacesService {
     if (!account) throw new NotFoundException(`Conta ${accountId} não encontrada`);
 
     const connector = this.registry.get(account.marketplace);
-    const ctx = await this.accountContext(accountId);
+
+    // Mercado Livre: renova o access_token antes de buscar, se preciso.
+    const ctx: ConnectorContext =
+      account.marketplace === 'MERCADO_LIVRE'
+        ? {
+            accountId,
+            credentials: await this.mlOAuth.ensureFreshToken(accountId),
+          }
+        : await this.accountContext(accountId);
+
     const result = await connector.fetchOrders(since, ctx);
     if (!result.ok) return { imported: 0, error: result.error };
 
+    const validStatuses = new Set(Object.values(OrderStatus));
     let imported = 0;
     for (const o of result.data ?? []) {
+      const status = validStatuses.has(o.status as OrderStatus)
+        ? (o.status as OrderStatus)
+        : 'PENDING';
       await this.prisma.order.upsert({
         where: {
           marketplace_externalOrderId: {
@@ -138,7 +153,7 @@ export class MarketplacesService {
           accountId,
           marketplace: account.marketplace,
           externalOrderId: o.externalOrderId,
-          status: 'PENDING',
+          status,
           buyerName: o.buyerName,
           buyerEmail: o.buyerEmail,
           buyerDoc: o.buyerDoc,
@@ -157,7 +172,7 @@ export class MarketplacesService {
             })),
           },
         },
-        update: { trackingCode: o.trackingCode },
+        update: { status, trackingCode: o.trackingCode },
       });
       imported++;
     }

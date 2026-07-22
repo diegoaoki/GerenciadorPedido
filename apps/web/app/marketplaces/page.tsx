@@ -48,6 +48,33 @@ export default function MarketplacesPage() {
     load();
   }
 
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  async function connectMl(accountId: string) {
+    try {
+      const { url } = await api.get<{ url: string }>(
+        `/marketplaces/mercado-livre/connect/${accountId}`,
+      );
+      window.open(url, '_blank'); // usuário autoriza na aba do ML
+    } catch (e) {
+      setFeedback((e as Error).message);
+    }
+  }
+
+  async function importOrders(accountId: string) {
+    setFeedback('Importando pedidos…');
+    try {
+      const res = await api.post<{ imported: number; error?: string }>(
+        `/marketplaces/accounts/${accountId}/import-orders`,
+      );
+      setFeedback(
+        res.error ? `Erro: ${res.error}` : `✅ ${res.imported} pedido(s) importado(s)/atualizado(s).`,
+      );
+    } catch (e) {
+      setFeedback((e as Error).message);
+    }
+  }
+
   return (
     <>
       <PageHeader title="Marketplaces" subtitle="Conecte suas contas de vendas" />
@@ -119,8 +146,31 @@ export default function MarketplacesPage() {
                   <div className="font-semibold">{a._count.orders}</div>
                 </div>
               </div>
+
+              <div className="mt-4 flex gap-2 border-t border-slate-100 pt-3">
+                {a.marketplace === 'MERCADO_LIVRE' && (
+                  <button
+                    onClick={() => connectMl(a.id)}
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+                  >
+                    🔗 Conectar
+                  </button>
+                )}
+                <button
+                  onClick={() => importOrders(a.id)}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+                >
+                  ⬇️ Importar pedidos
+                </button>
+              </div>
             </Card>
           ))}
+        </div>
+      )}
+
+      {feedback && (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-600">
+          {feedback}
         </div>
       )}
     </>
